@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------
+// Enums
+// --------------------------
+enum Role {
+  WHOLESALER
+  RETAILER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  FULFILLED
+  COMPLETED
+}
+
+// --------------------------
+// User
+// --------------------------
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  fullName  String?
+  phone     String?
+  role      Role     @default(RETAILER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop      Shop?
+  orders    Order[]
+  sentMessages     Message[] @relation("Sender")
+  receivedMessages Message[] @relation("Receiver")
+}
+
+// --------------------------
+// Shop (Wholesaler's store)
+// --------------------------
+model Shop {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  ownerId     String   @unique
+  owner       User     @relation(fields: [ownerId], references: [id])
+  products    Product[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// --------------------------
+// Product
+// --------------------------
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  shopId      String
+  shop        Shop     @relation(fields: [shopId], references: [id])
+  images      String[]
+  orders      Order[]  // <-- add this line
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// --------------------------
+// Order Request (Retailer requests products)
+// --------------------------
+model Order {
+  id         String      @id @default(uuid())
+  retailerId String
+  retailer   User        @relation(fields: [retailerId], references: [id])
+  productId  String
+  product    Product     @relation(fields: [productId], references: [id])
+  quantity   Int
+  status     OrderStatus @default(PENDING)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+// --------------------------
+// Chat Message (between users)
+// --------------------------
+model Message {
+  id         String   @id @default(uuid())
+  content    String
+  senderId   String
+  sender     User     @relation("Sender", fields: [senderId], references: [id])
+  receiverId String
+  receiver   User     @relation("Receiver", fields: [receiverId], references: [id])
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
