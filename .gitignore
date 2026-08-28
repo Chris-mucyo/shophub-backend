@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -11,9 +10,9 @@ yarn-error.log*
 .env.production
 
 # Prisma generated files (optional – you may commit these for reproducibility)
-# prisma/migrations/
-# prisma/dev.db
-# prisma/dev.db-journal
+ prisma/migrations/
+ prisma/dev.db
+ prisma/dev.db-journal
 
 # Build output
 dist/

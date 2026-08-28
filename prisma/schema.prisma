@@ -7,59 +7,92 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --------------------------
-// Enums
-// --------------------------
 enum Role {
-  WHOLESALER
   RETAILER
+  WHOLESALER
   ADMIN
 }
 
-enum OrderStatus {
-  PENDING
-  ACCEPTED
+enum UserStatus {
+  PENDING_EMAIL_VERIFICATION
+  PENDING_PHONE_VERIFICATION
+  PENDING_PROFILE
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
   REJECTED
-  FULFILLED
-  COMPLETED
+  DELETED
 }
 
-// --------------------------
-// User
-// --------------------------
+enum WholesalerStatus {
+  NOT_APPLIED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  fullName  String?
-  phone     String?
-  role      Role     @default(RETAILER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String           @id @default(uuid())
+  email            String           @unique
+  phone            String           @unique
+  password         String
+  fullName         String
+  status           UserStatus       @default(PENDING_EMAIL_VERIFICATION)
+  emailVerified    Boolean          @default(false)
+  phoneVerified    Boolean          @default(false)
+  role             Role             @default(RETAILER)
+  wholesalerStatus WholesalerStatus @default(NOT_APPLIED)
 
-  shop      Shop?
-  orders    Order[]
-  sentMessages     Message[] @relation("Sender")
-  receivedMessages Message[] @relation("Receiver")
+  // KYC / Profile fields
+  nationalIdNumber String? @unique
+  nationalIdImage  String?
+  selfieImage      String?
+  addressDistrict  String?
+  addressSector    String?
+  addressCell      String?
+  addressVillage   String?
+  proofOfAddress   String?
+
+  // Wholesaler business fields
+  businessName     String?
+  tin              String? @unique
+  businessRegNo    String?
+  businessAddress  String?
+  businessCategory String?
+  businessDocUrl   String?
+
+  profileSubmittedAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  refreshTokens    RefreshToken[]
+  shop             Shop?
+  orders           Order[]
+  sentMessages     Message[]      @relation("Sender")
+  receivedMessages Message[]      @relation("Receiver")
 }
 
-// --------------------------
-// Shop (Wholesaler's store)
-// --------------------------
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
 model Shop {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
   description String?
-  ownerId     String   @unique
-  owner       User     @relation(fields: [ownerId], references: [id])
+  ownerId     String    @unique
+  owner       User      @relation(fields: [ownerId], references: [id])
   products    Product[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
-// --------------------------
-// Product
-// --------------------------
 model Product {
   id          String   @id @default(uuid())
   name        String
@@ -69,14 +102,11 @@ model Product {
   shopId      String
   shop        Shop     @relation(fields: [shopId], references: [id])
   images      String[]
-  orders      Order[]  // <-- add this line
+  orders      Order[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
-// --------------------------
-// Order Request (Retailer requests products)
-// --------------------------
 model Order {
   id         String      @id @default(uuid())
   retailerId String
@@ -89,9 +119,14 @@ model Order {
   updatedAt  DateTime    @updatedAt
 }
 
-// --------------------------
-// Chat Message (between users)
-// --------------------------
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  FULFILLED
+  COMPLETED
+}
+
 model Message {
   id         String   @id @default(uuid())
   content    String
