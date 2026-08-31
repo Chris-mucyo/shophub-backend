@@ -16,10 +16,12 @@ import { VerifyPhoneDto } from './dto/verify-phone.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
+import { GoogleCallbackDto } from './dto/google-callback.dto';
 import type { EmailService } from '../providers/email/email.interface';
 import type { SmsService } from '../providers/sms/sms.interface';
 import { REDIS_CLIENT } from '../redis/redis.provider';
 import Redis from 'ioredis';
+import { OAuth2Client } from 'google-auth-library';
 
 interface GoogleUserInfo {
   sub: string;
@@ -176,6 +178,92 @@ export class AuthService {
     };
   }
 
+  async googleCallback(dto: GoogleCallbackDto) {
+    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID');
+    const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET');
+    const redirectUri = this.config.get<string>('GOOGLE_CALLBACK_URL');
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new BadRequestException('Google OAuth is not configured');
+    }
+
+    const oAuth2Client = new OAuth2Client(clientId, clientSecret, redirectUri);
+
+    // Exchange authorization code for tokens
+    const { tokens } = await oAuth2Client.getToken(dto.code);
+    oAuth2Client.setCredentials(tokens);
+
+    if (!tokens.access_token) {
+      throw new UnauthorizedException('Failed to obtain access token from Google');
+    }
+
+    // Get user info using the access token
+    const googleUser = await this.validateGoogleToken(tokens.access_token);
+
+    if (!googleUser.email) {
+      throw new BadRequestException(
+        'Google account must have a verified email',
+      );
+    }
+
+    // Check if user exists with this Google ID
+    let user = await this.prisma.user.findUnique({
+      where: { googleId: googleUser.googleId },
+    });
+
+    if (user) {
+      // User exists, update googleId if not set
+      if (!user.googleId) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { googleId: googleUser.googleId },
+        });
+      }
+    } else {
+      // Check if user exists with same email
+      user = await this.prisma.user.findUnique({
+        where: { email: googleUser.email },
+      });
+
+      if (user) {
+        // Link Google account to existing user
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            googleId: googleUser.googleId,
+            emailVerified: true, // Google emails are pre-verified
+          },
+        });
+      } else {
+        // Create new user with Google account
+        // Password is nullable for Google OAuth users
+        user = await this.prisma.user.create({
+          data: {
+            email: googleUser.email,
+            phone: `+2507${Math.floor(10000000 + Math.random() * 90000000)}`, // Temporary phone, user must update
+            fullName: googleUser.fullName || 'Google User',
+            password: null, // Nullable for Google OAuth users
+            googleId: googleUser.googleId,
+            emailVerified: true,
+            status: 'PENDING_PHONE_VERIFICATION', // Phone still needs verification
+          },
+        });
+
+        // Send phone verification code
+        const phoneCode = this.generateCode();
+        await this.redis.set(`phone_verify:${user.id}`, phoneCode, 'EX', 600);
+        await this.smsService.sendVerificationSms(user.phone, phoneCode);
+      }
+    }
+
+    // Check account status
+    if (user.status === 'SUSPENDED' || user.status === 'DELETED') {
+      throw new UnauthorizedException('Account is suspended or deleted');
+    }
+
+    return this.generateTokens(user.id, user.role);
+  }
+
   async verifyEmail(userId: string, dto: VerifyEmailDto) {
     const storedCode = await this.redis.get(`email_verify:${userId}`);
     if (!storedCode || storedCode !== dto.code) {
@@ -184,13 +272,15 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { 
+      data: {
         emailVerified: true,
         status: 'PENDING_PHONE_VERIFICATION',
       },
     });
     await this.redis.del(`email_verify:${userId}`);
-    return { message: 'Email verified successfully. Please verify your phone.' };
+    return {
+      message: 'Email verified successfully. Please verify your phone.',
+    };
   }
 
   async verifyPhone(userId: string, dto: VerifyPhoneDto) {
@@ -201,13 +291,15 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { 
+      data: {
         phoneVerified: true,
         status: 'PENDING_PROFILE',
       },
     });
     await this.redis.del(`phone_verify:${userId}`);
-    return { message: 'Phone verified successfully. Please complete your profile.' };
+    return {
+      message: 'Phone verified successfully. Please complete your profile.',
+    };
   }
 
   async resendEmailVerification(userId: string) {

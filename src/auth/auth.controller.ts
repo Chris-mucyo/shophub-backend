@@ -5,6 +5,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
@@ -16,6 +17,7 @@ import { RefreshDto } from './dto/refresh.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
+import { GoogleCallbackDto } from './dto/google-callback.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 
@@ -40,7 +42,21 @@ export class AuthController {
   @Post('google')
   @HttpCode(HttpStatus.OK)
   async googleLogin(@Body() dto: GoogleAuthDto) {
+    // Deprecated: Use authorization code flow (POST /auth/google/callback) in production
+    // This endpoint accepts an access token directly (implicit flow) for development only
+    if (process.env.NODE_ENV === 'production') {
+      throw new BadRequestException(
+        'Access token flow is disabled in production. Use authorization code flow via POST /auth/google/callback',
+      );
+    }
     return this.authService.googleLogin(dto);
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('google/callback')
+  @HttpCode(HttpStatus.OK)
+  async googleCallback(@Body() dto: GoogleCallbackDto) {
+    return this.authService.googleCallback(dto);
   }
 
   @Throttle({ default: { limit: 3, ttl: 60000 } })

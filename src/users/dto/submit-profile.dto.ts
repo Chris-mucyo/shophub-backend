@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, Matches, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  Matches,
+  MaxLength,
+  IsOptional,
+} from 'class-validator';
 
 export class SubmitProfileDto {
   @IsString()
@@ -8,11 +14,11 @@ export class SubmitProfileDto {
 
   @IsString()
   @IsNotEmpty()
-  nationalIdImage: string; // Cloudinary URL
+  nationalIdImage: string; // Cloudinary URL (populated after upload)
 
   @IsString()
   @IsNotEmpty()
-  selfieImage: string; // Cloudinary URL
+  selfieImage: string; // Cloudinary URL (populated after upload)
 
   @IsString()
   @IsNotEmpty()
@@ -36,5 +42,5 @@ export class SubmitProfileDto {
 
   @IsString()
   @IsNotEmpty()
-  proofOfAddress: string; // Cloudinary URL (utility bill, bank statement, etc.)
+  proofOfAddress: string; // Cloudinary URL (populated after upload)
 }

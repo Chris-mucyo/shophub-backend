@@ -6,7 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdateWholesalerStatusDto } from './dto/update-wholesaler-status.dto';
-import { UserStatus } from '@prisma/client';
+import { UserStatus, WholesalerStatus } from '@prisma/client';
 
 @Injectable()
 export class AdminService {
@@ -106,9 +106,20 @@ export class AdminService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    if (user.wholesalerStatus !== 'PENDING' && dto.status !== 'REJECTED') {
+    // Validate wholesaler status transitions
+    const validWholesalerTransitions: Record<
+      WholesalerStatus,
+      WholesalerStatus[]
+    > = {
+      NOT_APPLIED: [], // User applies via POST /users/wholesaler/apply, not admin
+      PENDING: ['APPROVED', 'REJECTED'],
+      APPROVED: ['REJECTED'], // Can revoke approval
+      REJECTED: ['PENDING'], // Can allow re-application
+    };
+
+    if (!validWholesalerTransitions[user.wholesalerStatus]?.includes(dto.status)) {
       throw new BadRequestException(
-        'Can only update status for pending applications',
+        `Cannot transition wholesaler status from ${user.wholesalerStatus} to ${dto.status}`,
       );
     }
 
