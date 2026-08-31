@@ -35,13 +35,14 @@ model User {
   id               String           @id @default(uuid())
   email            String           @unique
   phone            String           @unique
-  password         String
+  password         String?
   fullName         String
   status           UserStatus       @default(PENDING_EMAIL_VERIFICATION)
   emailVerified    Boolean          @default(false)
   phoneVerified    Boolean          @default(false)
   role             Role             @default(RETAILER)
   wholesalerStatus WholesalerStatus @default(NOT_APPLIED)
+  googleId         String?          @unique
 
   // KYC / Profile fields
   nationalIdNumber String? @unique
