@@ -8,6 +8,11 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AdminModule } from './admin/admin.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { ShopsModule } from './shops/shops.module';
+import { ProductsModule } from './products/products.module';
+import { SocialModule } from './social/social.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { FeedModule } from './feed/feed.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 
@@ -21,6 +26,11 @@ import { RedisModule } from './redis/redis.module';
     UsersModule,
     AdminModule,
     SchedulerModule,
+    ShopsModule,
+    ProductsModule,
+    SocialModule,
+    NotificationsModule,
+    FeedModule,
   ],
   controllers: [],
   providers: [

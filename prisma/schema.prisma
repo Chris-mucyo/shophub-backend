@@ -31,6 +31,22 @@ enum WholesalerStatus {
   REJECTED
 }
 
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  FULFILLED
+  COMPLETED
+}
+
+enum NotificationType {
+  FOLLOW
+  LIKE
+  COMMENT
+  ORDER
+  SYSTEM
+}
+
 model User {
   id               String           @id @default(uuid())
   email            String           @unique
@@ -66,11 +82,15 @@ model User {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  refreshTokens    RefreshToken[]
-  shop             Shop?
-  orders           Order[]
-  sentMessages     Message[]      @relation("Sender")
-  receivedMessages Message[]      @relation("Receiver")
+  refreshTokens       RefreshToken[]
+  shop                Shop?
+  orders              Order[]
+  sentMessages        Message[]       @relation("Sender")
+  receivedMessages    Message[]       @relation("Receiver")
+  follows             Follow[]        @relation("Follower")
+  likes               Like[]
+  comments            Comment[]
+  notifications       Notification[]  @relation("UserNotifications")
 }
 
 model RefreshToken {
@@ -84,28 +104,50 @@ model RefreshToken {
 }
 
 model Shop {
-  id          String    @id @default(uuid())
-  name        String
-  description String?
-  ownerId     String    @unique
-  owner       User      @relation(fields: [ownerId], references: [id])
-  products    Product[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String    @id @default(uuid())
+  name            String
+  description     String?
+  bio             String?
+  avatarUrl       String?
+  coverPhotoUrl   String?
+  category        String?
+  location        String?
+  website         String?
+  socialLinks     Json?
+  followersCount  Int       @default(0)
+  productsCount   Int       @default(0)
+  ownerId         String    @unique
+  owner           User      @relation(fields: [ownerId], references: [id])
+  products        Product[]
+  followers       Follow[]  @relation("ShopFollowers")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([category])
+  @@index([location])
 }
 
 model Product {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  price       Decimal  @db.Decimal(10, 2)
-  stock       Int      @default(0)
-  shopId      String
-  shop        Shop     @relation(fields: [shopId], references: [id])
-  images      String[]
-  orders      Order[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String      @id @default(uuid())
+  name          String
+  description   String?
+  caption       String?
+  tags          String[]
+  price         Decimal     @db.Decimal(10, 2)
+  stock         Int         @default(0)
+  shopId        String
+  shop          Shop        @relation(fields: [shopId], references: [id])
+  images        String[]
+  likeCount     Int         @default(0)
+  commentCount  Int         @default(0)
+  orders        Order[]
+  likes         Like[]
+  comments      Comment[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([shopId])
+  @@index([createdAt])
 }
 
 model Order {
@@ -120,12 +162,58 @@ model Order {
   updatedAt  DateTime    @updatedAt
 }
 
-enum OrderStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-  FULFILLED
-  COMPLETED
+model Follow {
+  id        String   @id @default(uuid())
+  followerId String
+  follower  User     @relation("Follower", fields: [followerId], references: [id])
+  shopId    String
+  shop      Shop     @relation("ShopFollowers", fields: [shopId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([followerId, shopId])
+  @@index([shopId])
+  @@index([followerId])
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@index([userId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@index([userId])
+}
+
+model Notification {
+  id        String            @id @default(uuid())
+  userId    String
+  user      User              @relation("UserNotifications", fields: [userId], references: [id])
+  type      NotificationType
+  message   String
+  read      Boolean           @default(false)
+  createdAt DateTime          @default(now())
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
 }
 
 model Message {
